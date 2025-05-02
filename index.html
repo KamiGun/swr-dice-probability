@@ -1,0 +1,160 @@
+{
+  "index.html": `
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Калькулятор вероятности кубиков</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-900 flex items-center justify-center min-h-screen">
+    <div class="bg-gray-800 p-6 rounded-lg shadow-lg w-full max-w-md">
+        <h1 class="text-2xl font-bold mb-4 text-center text-white">Калькулятор вероятности кубиков</h1>
+        <p class="text-sm text-gray-300 mb-2">
+            <strong>Обычные кубики:</strong> 2 пустые грани, 1 кресты (2 успеха), 1 прямое попадание (1 успех), 2 попадания (1 успех).
+        </p>
+        <p class="text-sm text-gray-300 mb-4">
+            <strong>Зелёные кубики:</strong> 4 пустые грани, 2 прямое попадание (1 успех).
+        </p>
+        <div class="mb-4">
+            <label for="regularDiceCount" class="block text-sm font-medium text-gray-200">Обычные кубики (0-10):</label>
+            <input type="number" id="regularDiceCount" min="0" max="10" value="3" class="mt-1 block w-full p-2 border border-gray-600 rounded-md bg-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-500" onchange="restrictInput()">
+        </div>
+        <div class="mb-4">
+            <label for="greenDiceCount" class="block text-sm font-medium text-gray-200">Зелёные кубики (0-3):</label>
+            <input type="number" id="greenDiceCount" min="0" max="3" value="0" class="mt-1 block w-full p-2 border border-gray-600 rounded-md bg-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-500" onchange="restrictInput()">
+        </div>
+        <button onclick="calculateProbabilities()" class="w-full bg-blue-600 text-white p-2 rounded-md hover:bg-blue-700 transition">Рассчитать</button>
+        <div id="results" class="mt-4 text-sm text-gray-200"></div>
+    </div>
+
+    <script>
+        function restrictInput() {
+            const regularInput = document.getElementById('regularDiceCount');
+            const greenInput = document.getElementById('greenDiceCount');
+            regularInput.value = Math.max(0, Math.min(10, parseInt(regularInput.value) || 0));
+            greenInput.value = Math.max(0, Math.min(3, parseInt(greenInput.value) || 0));
+            const total = parseInt(regularInput.value) + parseInt(greenInput.value);
+            if (total > 13) {
+                greenInput.value = Math.max(0, 13 - parseInt(regularInput.value));
+                if (greenInput.value > 3) {
+                    regularInput.value = 13 - 3;
+                    greenInput.value = 3;
+                }
+            }
+        }
+
+        function calculateProbabilities() {
+            const nRegular = parseInt(document.getElementById('regularDiceCount').value);
+            const nGreen = parseInt(document.getElementById('greenDiceCount').value);
+            const totalDice = nRegular + nGreen;
+
+            if (totalDice === 0) {
+                document.getElementById('results').innerHTML = '<p class="text-red-400">Выберите хотя бы один кубик.</p>';
+                return;
+            }
+
+            // Обычные кубики
+            const pEmptyRegular = 2/6; // Вероятность пустой грани
+            const pSuccessRegular = 4/6; // Вероятность хотя бы 1 успеха
+            const pCrossRegular = 1/6; // Вероятность крестов (2 успеха)
+            const pSingleSuccessRegular = 3/6; // Вероятность 1 успеха
+
+            // Зелёные кубики
+            const pEmptyGreen = 4/6; // Вероятность пустой грани
+            const pSuccessGreen = 2/6; // Вероятность 1 успеха
+
+            // Все пустые грани
+            const probAllEmpty = Math.pow(pEmptyRegular, nRegular) * Math.pow(pEmptyGreen, nGreen);
+
+            // Хотя бы 1 успех
+            const probAtLeastOneSuccess = 1 - probAllEmpty;
+
+            // Хотя бы 1 крест (только от обычных кубиков)
+            const probAtLeastOneCross = nRegular > 0 ? 1 - Math.pow(1 - pCrossRegular, nRegular) : 0;
+
+            // Среднее количество успехов
+            const expectedSuccesses = nRegular * (pCrossRegular * 2 + pSingleSuccessRegular * 1) + nGreen * (pSuccessGreen * 1);
+
+            // Вероятности для каждого количества успехов
+            const maxSuccesses = 2 * nRegular + nGreen; // Максимум успехов: 2 от каждого обычного, 1 от каждого зелёного
+            const successProbabilities = calculateSuccessProbabilities(nRegular, nGreen, maxSuccesses);
+
+            // Форматирование результатов
+            let successProbHtml = '<p><strong>Вероятности по количеству успехов:</strong></p><ul>';
+            for (let k = 0; k <= maxSuccesses; k++) {
+                successProbHtml += `<li>${k} успех: ${(successProbabilities[k] * 100).toFixed(10)}%</li>`;
+            }
+            successProbHtml += '</ul>';
+
+            document.getElementById('results').innerHTML = `
+                <p><strong>Всего кубиков:</strong> ${totalDice} (Обычные: ${nRegular}, Зелёные: ${nGreen})</p>
+                <p><strong>Вероятность всех пустых граней:</strong> ${(probAllEmpty * 100).toFixed(10)}%</p>
+                <p><strong>Вероятность хотя бы 1 успеха:</strong> ${(probAtLeastOneSuccess * 100).toFixed(10)}%</p>
+                <p><strong>Вероятность хотя бы 1 спецсвойство (2 успеха):</strong> ${(probAtLeastOneCross * 100).toFixed(10)}%</p>
+                <p><strong>Ожидаемое количество успехов:</strong> ${expectedSuccesses.toFixed(10)}</p>
+                ${successProbHtml}
+            `;
+        }
+
+        function calculateSuccessProbabilities(nRegular, nGreen, maxSuccesses) {
+            const probs = new Array(maxSuccesses + 1).fill(0);
+            // Вероятности для обычных кубиков: 0, 1, 2 успеха
+            const pRegular = [2/6, 3/6, 1/6]; // [P(0), P(1), P(2)]
+            // Вероятности для зелёных кубиков: 0, 1 успех
+            const pGreen = [4/6, 2/6]; // [P(0), P(1)]
+
+            // Используем динамическое программирование для комбинации кубиков
+            let dp = new Array(maxSuccesses + 1).fill(0);
+            dp[0] = 1; // Базовый случай: вероятность 0 успехов
+
+            // Обрабатываем обычные кубики
+            for (let i = 0; i < nRegular; i++) {
+                const newDp = new Array(maxSuccesses + 1).fill(0);
+                for (let prev = 0; prev <= maxSuccesses; prev++) {
+                    for (let s = 0; s <= 2 && prev + s <= maxSuccesses; s++) {
+                        newDp[prev + s] += dp[prev] * pRegular[s];
+                    }
+                }
+                dp = newDp;
+            }
+
+            // Обрабатываем зелёные кубики
+            for (let i = 0; i < nGreen; i++) {
+                const newDp = new Array(maxSuccesses + 1).fill(0);
+                for (let prev = 0; prev <= maxSuccesses; prev++) {
+                    for (let s = 0; s <= 1 && prev + s <= maxSuccesses; s++) {
+                        newDp[prev + s] += dp[prev] * pGreen[s];
+                    }
+                }
+                dp = newDp;
+            }
+
+            return dp;
+        }
+
+        function binomialProbability(n, k, p) {
+            if (n === 0 && k === 0) return 1;
+            if (n === 0 || k > n) return 0;
+            const coef = binomialCoefficient(n, k);
+            return coef * Math.pow(p, k) * Math.pow(1 - p, n - k);
+        }
+
+        function binomialCoefficient(n, k) {
+            if (k < 0 || k > n) return 0;
+            let coef = 1;
+            for (let i = 0; i < k; i++) {
+                coef *= (n - i) / (i + 1);
+            }
+            return coef;
+        }
+
+        // Вычислить при загрузке страницы
+        calculateProbabilities();
+    </script>
+</body>
+</html>
+  `,
+  ".nojekyll": ""
+}
