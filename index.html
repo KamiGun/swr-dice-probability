@@ -1,5 +1,3 @@
-{
-  "index.html": `
 <!DOCTYPE html>
 <html lang="ru">
 <head>
@@ -58,7 +56,7 @@
             // Обычные кубики
             const pEmptyRegular = 2/6; // Вероятность пустой грани
             const pSuccessRegular = 4/6; // Вероятность хотя бы 1 успеха
-            const pCrossRegular = 1/6; // Вероятность крестов (2 успеха)
+            const pCrossRegular = 1/6; // Вероятность крестов 2 успеха
             const pSingleSuccessRegular = 3/6; // Вероятность 1 успеха
 
             // Зелёные кубики
@@ -82,7 +80,7 @@
             const successProbabilities = calculateSuccessProbabilities(nRegular, nGreen, maxSuccesses);
 
             // Форматирование результатов
-            let successProbHtml = '<p><strong>Вероятности по количеству успехов:</strong></p><ul>';
+            let successProbHtml = '<p><strong>Вероятности по количеству успеха:</strong></p><ul>';
             for (let k = 0; k <= maxSuccesses; k++) {
                 successProbHtml += `<li>${k} успех: ${(successProbabilities[k] * 100).toFixed(10)}%</li>`;
             }
@@ -93,7 +91,7 @@
                 <p><strong>Вероятность всех пустых граней:</strong> ${(probAllEmpty * 100).toFixed(10)}%</p>
                 <p><strong>Вероятность хотя бы 1 успеха:</strong> ${(probAtLeastOneSuccess * 100).toFixed(10)}%</p>
                 <p><strong>Вероятность хотя бы 1 спецсвойство (2 успеха):</strong> ${(probAtLeastOneCross * 100).toFixed(10)}%</p>
-                <p><strong>Ожидаемое количество успехов:</strong> ${expectedSuccesses.toFixed(10)}</p>
+                <p><strong>Ожидаемое количество успеха:</strong> ${expectedSuccesses.toFixed(10)}</p>
                 ${successProbHtml}
             `;
         }
@@ -155,6 +153,3 @@
     </script>
 </body>
 </html>
-  `,
-  ".nojekyll": ""
-}
