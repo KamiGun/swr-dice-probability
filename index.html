@@ -7,107 +7,235 @@
     <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="bg-gray-900 flex items-center justify-center min-h-screen">
-    <div class="bg-gray-800 p-6 rounded-lg shadow-lg w-full max-w-md">
-        <h1 class="text-2xl font-bold mb-4 text-center text-white">Калькулятор вероятности кубиков</h1>
+    <div class="bg-gray-800 p-6 rounded-lg shadow-lg w-full max-w-3xl">
+        <h1 class="text-2xl font-bold mb-4 text-center text-white">Калькулятор вероятности кубиков (для миссий)</h1>
         <p class="text-sm text-gray-300 mb-2">
             <strong>Обычные кубики:</strong> 2 пустые грани, 1 кресты (2 успеха), 1 прямое попадание (1 успех), 2 попадания (1 успех).
         </p>
         <p class="text-sm text-gray-300 mb-4">
             <strong>Зелёные кубики:</strong> 4 пустые грани, 2 прямое попадание (1 успех).
         </p>
-        <div class="mb-4">
-            <label for="regularDiceCount" class="block text-sm font-medium text-gray-200">Обычные кубики (0-10):</label>
-            <input type="number" id="regularDiceCount" min="0" max="10" value="3" class="mt-1 block w-full p-2 border border-gray-600 rounded-md bg-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-500" onchange="restrictInput()">
+        <div class="flex flex-col md:flex-row gap-6 mb-6">
+            <!-- Атакующий -->
+            <div class="flex-1">
+                <h2 class="text-lg font-semibold mb-2 text-white">Атакующий</h2>
+                <div class="mb-4">
+                    <label for="regularDiceCount" class="block text-sm font-medium text-gray-200">Обычные кубики (0-10):</label>
+                    <input type="number" id="regularDiceCount" min="0" max="10" value="3" class="mt-1 block w-full p-2 border border-gray-600 rounded-md bg-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-500" onchange="restrictInput()">
+                </div>
+                <div class="mb-4">
+                    <label for="greenDiceCount" class="block text-sm font-medium text-gray-200">Зелёные кубики (0-3):</label>
+                    <input type="number" id="greenDiceCount" min="0" max="3" value="0" class="mt-1 block w-full p-2 border border-gray-600 rounded-md bg-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-500" onchange="restrictInput()">
+                </div>
+                <div class="mb-4">
+                    <label for="attackerBonus" class="flex items-center text-sm font-medium text-gray-200">
+                        <input type="checkbox" id="attackerBonus" class="mr-2" onchange="calculateProbabilities()">
+                        Гарантированные 2 успеха
+                    </label>
+                </div>
+            </div>
+            <!-- Защищающийся -->
+            <div class="flex-1">
+                <h2 class="text-lg font-semibold mb-2 text-white">Защищающийся</h2>
+                <div class="mb-4">
+                    <label for="defenderRegularDiceCount" class="block text-sm font-medium text-gray-200">Обычные кубики (0-10):</label>
+                    <input type="number" id="defenderRegularDiceCount" min="0" max="10" value="0" class="mt-1 block w-full p-2 border border-gray-600 rounded-md bg-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-500" onchange="restrictInput()">
+                </div>
+                <div class="mb-4">
+                    <label for="defenderGreenDiceCount" class="block text-sm font-medium text-gray-200">Зелёные кубики (0-3):</label>
+                    <input type="number" id="defenderGreenDiceCount" min="0" max="3" value="0" class="mt-1 block w-full p-2 border border-gray-600 rounded-md bg-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-500" onchange="restrictInput()">
+                </div>
+                <div class="mb-4">
+                    <label for="defenderBonus" class="flex items-center text-sm font-medium text-gray-200">
+                        <input type="checkbox" id="defenderBonus" class="mr-2" onchange="calculateProbabilities()">
+                        Гарантированные 2 успеха
+                    </label>
+                </div>
+            </div>
         </div>
-        <div class="mb-4">
-            <label for="greenDiceCount" class="block text-sm font-medium text-gray-200">Зелёные кубики (0-3):</label>
-            <input type="number" id="greenDiceCount" min="0" max="3" value="0" class="mt-1 block w-full p-2 border border-gray-600 rounded-md bg-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-500" onchange="restrictInput()">
-        </div>
-        <button onclick="calculateProbabilities()" class="w-full bg-blue-600 text-white p-2 rounded-md hover:bg-blue-700 transition">Рассчитать</button>
         <div id="results" class="mt-4 text-sm text-gray-200"></div>
     </div>
 
     <script>
-        function restrictInput() {
-            const regularInput = document.getElementById('regularDiceCount');
-            const greenInput = document.getElementById('greenDiceCount');
+        // Константы для вероятностей граней кубиков
+        const DICE_PROBS = {
+            regular: {
+                empty: 2/6,
+                success: 4/6,
+                cross: 1/6,
+                singleSuccess: 3/6
+            },
+            green: {
+                empty: 4/6,
+                success: 2/6
+            }
+        };
+
+        // Точность значений после запятой
+        const numPrecision = 2;
+
+        function getExponent(str) {
+            const match = str.match(/e-(\d+)/);
+            return match ? parseFloat(match[1]) : null;
+        }
+
+        function getDecimalPlaces(num) {
+            let str = num.toString();
+            let decimalIndex = str.indexOf('.');
+            if (decimalIndex === -1) return 0;
+            let fractionalPart = str.slice(decimalIndex + 1);
+            if (!fractionalPart) return 0;
+            let nonNineIndex = fractionalPart.split('').findIndex(digit => digit !== '9');
+            if (nonNineIndex === -1) return fractionalPart.length;
+            return nonNineIndex + 1;
+        }
+
+        function customToFixed(value) {
+            if (value === 0) return '0.00';
+            if (value > 99) return value.toFixed(getDecimalPlaces(value) + (numPrecision - 1));
+            if (value >= 0.01) return value.toFixed(numPrecision);
+            let str = value.toExponential(1);
+            return value.toFixed(getExponent(str) + (numPrecision - 1));
+        }
+
+        function restrictDiceInput(regularInputId, greenInputId) {
+            const regularInput = document.getElementById(regularInputId);
+            const greenInput = document.getElementById(greenInputId);
             regularInput.value = Math.max(0, Math.min(10, parseInt(regularInput.value) || 0));
             greenInput.value = Math.max(0, Math.min(3, parseInt(greenInput.value) || 0));
             const total = parseInt(regularInput.value) + parseInt(greenInput.value);
             if (total > 13) {
                 greenInput.value = Math.max(0, 13 - parseInt(regularInput.value));
                 if (greenInput.value > 3) {
-                    regularInput.value = 13 - 3;
+                    regularInput.value = 10;
                     greenInput.value = 3;
                 }
             }
         }
 
-        function calculateProbabilities() {
-            const nRegular = parseInt(document.getElementById('regularDiceCount').value);
-            const nGreen = parseInt(document.getElementById('greenDiceCount').value);
-            const totalDice = nRegular + nGreen;
+        function restrictInput() {
+            restrictDiceInput('regularDiceCount', 'greenDiceCount');
+            restrictDiceInput('defenderRegularDiceCount', 'defenderGreenDiceCount');
+            calculateProbabilities();
+        }
 
-            if (totalDice === 0) {
-                document.getElementById('results').innerHTML = '<p class="text-red-400">Выберите хотя бы один кубик.</p>';
-                return;
+        function calculatePlayerProbabilities(nRegular, nGreen, hasBonus, maxSuccesses) {
+            const bonusSuccesses = hasBonus ? 2 : 0;
+            const totalDice = nRegular + nGreen;
+            if (totalDice === 0 && !hasBonus) return null;
+
+            const probAllEmpty = hasBonus ? 0 : Math.pow(DICE_PROBS.regular.empty, nRegular) * Math.pow(DICE_PROBS.green.empty, nGreen);
+            const probAtLeastOneSuccess = hasBonus ? 1 : 1 - probAllEmpty;
+            const probAtLeastOneCross = nRegular > 0 ? 1 - Math.pow(1 - DICE_PROBS.regular.cross, nRegular) : 0;
+            const expectedSuccesses = nRegular * (DICE_PROBS.regular.cross * 2 + DICE_PROBS.regular.singleSuccess) + nGreen * DICE_PROBS.green.success + bonusSuccesses;
+            const successProbabilities = calculateSuccessProbabilities(nRegular, nGreen, maxSuccesses, hasBonus);
+
+            return {
+                totalDice,
+                nRegular,
+                nGreen,
+                hasBonus,
+                probAllEmpty,
+                probAtLeastOneSuccess,
+                probAtLeastOneCross,
+                expectedSuccesses,
+                successProbabilities,
+                maxSuccesses
+            };
+        }
+
+        function formatPlayerResults(playerData, title) {
+            if (!playerData) {
+                return `<div class="flex-1">
+                    <h2 class="text-lg font-semibold mb-2">${title}</h2>
+                    <p>${title} не использует кубики и не имеет гарантированного успеха.</p>
+                </div>`;
             }
 
-            // Обычные кубики
-            const pEmptyRegular = 2/6; // Вероятность пустой грани
-            const pSuccessRegular = 4/6; // Вероятность хотя бы 1 успеха
-            const pCrossRegular = 1/6; // Вероятность крестов 2 успеха
-            const pSingleSuccessRegular = 3/6; // Вероятность 1 успеха
-
-            // Зелёные кубики
-            const pEmptyGreen = 4/6; // Вероятность пустой грани
-            const pSuccessGreen = 2/6; // Вероятность 1 успеха
-
-            // Все пустые грани
-            const probAllEmpty = Math.pow(pEmptyRegular, nRegular) * Math.pow(pEmptyGreen, nGreen);
-
-            // Хотя бы 1 успех
-            const probAtLeastOneSuccess = 1 - probAllEmpty;
-
-            // Хотя бы 1 крест (только от обычных кубиков)
-            const probAtLeastOneCross = nRegular > 0 ? 1 - Math.pow(1 - pCrossRegular, nRegular) : 0;
-
-            // Среднее количество успехов
-            const expectedSuccesses = nRegular * (pCrossRegular * 2 + pSingleSuccessRegular * 1) + nGreen * (pSuccessGreen * 1);
-
-            // Вероятности для каждого количества успехов
-            const maxSuccesses = 2 * nRegular + nGreen; // Максимум успехов: 2 от каждого обычного, 1 от каждого зелёного
-            const successProbabilities = calculateSuccessProbabilities(nRegular, nGreen, maxSuccesses);
-
-            // Форматирование результатов
             let successProbHtml = '<p><strong>Вероятности по количеству успеха:</strong></p><ul>';
-            for (let k = 0; k <= maxSuccesses; k++) {
-                successProbHtml += `<li>${k} успех: ${(successProbabilities[k] * 100).toFixed(10)}%</li>`;
+            for (let k = 0; k <= playerData.maxSuccesses; k++) {
+                successProbHtml += `<li>${k} успех: ${customToFixed(playerData.successProbabilities[k] * 100)}%</li>`;
             }
             successProbHtml += '</ul>';
 
-            document.getElementById('results').innerHTML = `
-                <p><strong>Всего кубиков:</strong> ${totalDice} (Обычные: ${nRegular}, Зелёные: ${nGreen})</p>
-                <p><strong>Вероятность всех пустых граней:</strong> ${(probAllEmpty * 100).toFixed(10)}%</p>
-                <p><strong>Вероятность хотя бы 1 успеха:</strong> ${(probAtLeastOneSuccess * 100).toFixed(10)}%</p>
-                <p><strong>Вероятность хотя бы 1 спецсвойство (2 успеха):</strong> ${(probAtLeastOneCross * 100).toFixed(10)}%</p>
-                <p><strong>Ожидаемое количество успеха:</strong> ${expectedSuccesses.toFixed(10)}</p>
+            return `<div class="flex-1">
+                <h2 class="text-lg font-semibold mb-2">${title}</h2>
+                <p><strong>Всего кубиков:</strong> ${playerData.totalDice} (Обычные: ${playerData.nRegular}, Зелёные: ${playerData.nGreen})${playerData.hasBonus ? ', +2 гарантированных успеха' : ''}</p>
+                <p><strong>Вероятность всех пустых граней:</strong> ${customToFixed(playerData.probAllEmpty * 100)}%</p>
+                <p><strong>Вероятность хотя бы 1 успеха:</strong> ${customToFixed(playerData.probAtLeastOneSuccess * 100)}%</p>
+                <p><strong>Вероятность хотя бы 1 креста (2 успеха от кубиков):</strong> ${customToFixed(playerData.probAtLeastOneCross * 100)}%</p>
+                <p><strong>Ожидаемое количество успеха:</strong> ${customToFixed(playerData.expectedSuccesses)}</p>
                 ${successProbHtml}
-            `;
+            </div>`;
         }
 
-        function calculateSuccessProbabilities(nRegular, nGreen, maxSuccesses) {
+        function calculateProbabilities() {
+            const nRegular = parseInt(document.getElementById('regularDiceCount').value);
+            const nGreen = parseInt(document.getElementById('greenDiceCount').value);
+            const nDefenderRegular = parseInt(document.getElementById('defenderRegularDiceCount').value);
+            const nDefenderGreen = parseInt(document.getElementById('defenderGreenDiceCount').value);
+            const attackerBonus = document.getElementById('attackerBonus').checked;
+            const defenderBonus = document.getElementById('defenderBonus').checked;
+            const attackerTotal = nRegular + nGreen;
+            const defenderTotal = nDefenderRegular + nDefenderGreen;
+
+            if (attackerTotal === 0 && !attackerBonus && defenderTotal === 0 && !defenderBonus) {
+                document.getElementById('results').innerHTML = '<p class="text-red-400">Выберите хотя бы один кубик или гарантированные успехи для атакующего или защищающегося.</p>';
+                return;
+            }
+
+            const maxSuccessesAttacker = 2 * nRegular + nGreen + (attackerBonus ? 2 : 0);
+            const maxSuccessesDefender = 2 * nDefenderRegular + nDefenderGreen + (defenderBonus ? 2 : 0);
+
+            const attackerData = calculatePlayerProbabilities(nRegular, nGreen, attackerBonus, maxSuccessesAttacker);
+            const defenderData = calculatePlayerProbabilities(nDefenderRegular, nDefenderGreen, defenderBonus, maxSuccessesDefender);
+
+            let resultsHtml = '<div class="flex flex-col md:flex-row gap-6">';
+            resultsHtml += formatPlayerResults(attackerData, 'Атакующий');
+            resultsHtml += formatPlayerResults(defenderData, 'Защищающийся');
+            resultsHtml += '</div>';
+
+            // Вероятность победы атакующего
+            if ((attackerTotal > 0 || attackerBonus) && (defenderTotal > 0 || defenderBonus)) {
+                const attackerProbs = attackerData.successProbabilities;
+                const defenderProbs = defenderData.successProbabilities;
+                let winProbability = 0;
+                for (let sa = 0; sa <= maxSuccessesAttacker; sa++) {
+                    for (let sd = 0; sd <= maxSuccessesDefender; sd++) {
+                        if (sa > sd) {
+                            winProbability += attackerProbs[sa] * defenderProbs[sd];
+                        }
+                    }
+                }
+                resultsHtml += `
+                    <h2 class="text-lg font-semibold mb-2 mt-4">Вероятность победы</h2>
+                    <p><strong>Вероятность победы атакующего:</strong> ${customToFixed(winProbability * 100)}%</p>
+                `;
+            } else if (attackerTotal > 0 || attackerBonus) {
+                const probAllEmpty = attackerData.probAllEmpty;
+                const probAtLeastOneSuccess = 1 - probAllEmpty;
+                resultsHtml += `
+                    <h2 class="text-lg font-semibold mb-2 mt-4">Вероятность победы</h2>
+                    <p><strong>Вероятность победы атакующего:</strong> ${customToFixed(probAtLeastOneSuccess * 100)}%</p>
+                `;
+            } else {
+                resultsHtml += `
+                    <h2 class="text-lg font-semibold mb-2 mt-4">Вероятность победы</h2>
+                    <p><strong>Вероятность победы атакующего:</strong> 0.00%</p>
+                `;
+            }
+
+            document.getElementById('results').innerHTML = resultsHtml;
+        }
+
+        function calculateSuccessProbabilities(nRegular, nGreen, maxSuccesses, hasBonus) {
             const probs = new Array(maxSuccesses + 1).fill(0);
-            // Вероятности для обычных кубиков: 0, 1, 2 успеха
-            const pRegular = [2/6, 3/6, 1/6]; // [P(0), P(1), P(2)]
-            // Вероятности для зелёных кубиков: 0, 1 успех
-            const pGreen = [4/6, 2/6]; // [P(0), P(1)]
+            const pRegular = [DICE_PROBS.regular.empty, DICE_PROBS.regular.singleSuccess, DICE_PROBS.regular.cross];
+            const pGreen = [DICE_PROBS.green.empty, DICE_PROBS.green.success];
 
-            // Используем динамическое программирование для комбинации кубиков
             let dp = new Array(maxSuccesses + 1).fill(0);
-            dp[0] = 1; // Базовый случай: вероятность 0 успехов
+            dp[0] = 1;
 
-            // Обрабатываем обычные кубики
             for (let i = 0; i < nRegular; i++) {
                 const newDp = new Array(maxSuccesses + 1).fill(0);
                 for (let prev = 0; prev <= maxSuccesses; prev++) {
@@ -118,7 +246,6 @@
                 dp = newDp;
             }
 
-            // Обрабатываем зелёные кубики
             for (let i = 0; i < nGreen; i++) {
                 const newDp = new Array(maxSuccesses + 1).fill(0);
                 for (let prev = 0; prev <= maxSuccesses; prev++) {
@@ -129,26 +256,17 @@
                 dp = newDp;
             }
 
+            if (hasBonus) {
+                const newProbs = new Array(maxSuccesses + 1).fill(0);
+                for (let k = 0; k <= maxSuccesses - 2; k++) {
+                    newProbs[k + 2] = dp[k];
+                }
+                return newProbs;
+            }
+
             return dp;
         }
 
-        function binomialProbability(n, k, p) {
-            if (n === 0 && k === 0) return 1;
-            if (n === 0 || k > n) return 0;
-            const coef = binomialCoefficient(n, k);
-            return coef * Math.pow(p, k) * Math.pow(1 - p, n - k);
-        }
-
-        function binomialCoefficient(n, k) {
-            if (k < 0 || k > n) return 0;
-            let coef = 1;
-            for (let i = 0; i < k; i++) {
-                coef *= (n - i) / (i + 1);
-            }
-            return coef;
-        }
-
-        // Вычислить при загрузке страницы
         calculateProbabilities();
     </script>
 </body>
